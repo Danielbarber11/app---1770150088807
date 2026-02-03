@@ -1,0 +1,33 @@
+
+name: Build Android
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with: { node-version: 18 }
+      - run: |
+          npm install
+          mkdir -p dist
+          # If Node project, try build
+          if npm run | grep -q "build"; then npm run build; fi
+          
+          # Logic to find website files
+          if [ -d "dist" ] && [ "$(ls -A dist)" ]; then echo "Using build dist";
+          elif [ -d "public" ]; then cp -r public/* dist/;
+          else 
+            cp -r web_files/* dist/ || true
+            cp index.html dist/ || true
+          fi
+      - run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap add android && npx cap sync
+      - run: |
+          cd android && chmod +x gradlew && ./gradlew assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../app-debug.apk
+      - uses: softprops/action-gh-release@v1
+        with: { tag_name: v1.0, files: app-debug.apk }
+        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
